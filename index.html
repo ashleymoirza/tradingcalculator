@@ -1,0 +1,573 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Trading Risk & Performance Calculator</title>
+    <script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+    <script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/recharts/2.10.3/Recharts.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body>
+    <div id="root"></div>
+    
+    <script type="text/babel">
+        const { useState, useMemo } = React;
+        const { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } = Recharts;
+
+        const TrendingUp = () => (
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline>
+                <polyline points="17 6 23 6 23 12"></polyline>
+            </svg>
+        );
+
+        const Calculator = () => (
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <rect x="4" y="2" width="16" height="20" rx="2"></rect>
+                <line x1="8" y1="6" x2="16" y2="6"></line>
+                <line x1="16" y1="10" x2="16" y2="10"></line>
+                <line x1="12" y1="10" x2="12" y2="10"></line>
+                <line x1="8" y1="10" x2="8" y2="10"></line>
+                <line x1="16" y1="14" x2="16" y2="14"></line>
+                <line x1="12" y1="14" x2="12" y2="14"></line>
+                <line x1="8" y1="14" x2="8" y2="14"></line>
+                <line x1="16" y1="18" x2="16" y2="18"></line>
+                <line x1="12" y1="18" x2="12" y2="18"></line>
+                <line x1="8" y1="18" x2="8" y2="18"></line>
+            </svg>
+        );
+
+        const BarChart3 = () => (
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <line x1="18" y1="20" x2="18" y2="10"></line>
+                <line x1="12" y1="20" x2="12" y2="4"></line>
+                <line x1="6" y1="20" x2="6" y2="14"></line>
+            </svg>
+        );
+
+        const Plus = () => (
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <line x1="12" y1="5" x2="12" y2="19"></line>
+                <line x1="5" y1="12" x2="19" y2="12"></line>
+            </svg>
+        );
+
+        const Trash2 = () => (
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <polyline points="3 6 5 6 21 6"></polyline>
+                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+            </svg>
+        );
+
+        const TradeCalculator = () => {
+            const [activeTab, setActiveTab] = useState('calculator');
+            const [accountBalance, setAccountBalance] = useState(30);
+            const [riskPercentage, setRiskPercentage] = useState(5);
+            
+            const [entryPrice, setEntryPrice] = useState('');
+            const [stopLoss, setStopLoss] = useState('');
+            const [takeProfit, setTakeProfit] = useState('');
+            const [selectedAsset, setSelectedAsset] = useState('EURUSD');
+            
+            const [trades, setTrades] = useState([
+                {
+                    id: 1,
+                    date: '2025-01-01',
+                    asset: 'EURUSD',
+                    type: 'Long',
+                    entry: 1.0950,
+                    exit: 1.1050,
+                    lots: 0.01,
+                    risk: 1.5,
+                    profit: 10,
+                    balance: 40
+                }
+            ]);
+
+            const assets = {
+                'EURUSD': { name: 'EUR/USD', pipValue: 0.0001, contractSize: 100000 },
+                'GBPUSD': { name: 'GBP/USD', pipValue: 0.0001, contractSize: 100000 },
+                'USDJPY': { name: 'USD/JPY', pipValue: 0.01, contractSize: 100000 },
+                'AUDUSD': { name: 'AUD/USD', pipValue: 0.0001, contractSize: 100000 },
+                'USDCAD': { name: 'USD/CAD', pipValue: 0.0001, contractSize: 100000 },
+                'NZDUSD': { name: 'NZD/USD', pipValue: 0.0001, contractSize: 100000 },
+                'USDCHF': { name: 'USD/CHF', pipValue: 0.0001, contractSize: 100000 },
+                'EURGBP': { name: 'EUR/GBP', pipValue: 0.0001, contractSize: 100000 },
+                'EURJPY': { name: 'EUR/JPY', pipValue: 0.01, contractSize: 100000 },
+                'GBPJPY': { name: 'GBP/JPY', pipValue: 0.01, contractSize: 100000 },
+                'BTCUSD': { name: 'Bitcoin', pipValue: 1, contractSize: 1 },
+                'XAUUSD': { name: 'Gold (XAU)', pipValue: 0.01, contractSize: 100 },
+                'NAS100': { name: 'Nasdaq 100', pipValue: 0.01, contractSize: 1 },
+                'SPX500': { name: 'S&P 500', pipValue: 0.01, contractSize: 1 },
+            };
+
+            const calculatePosition = () => {
+                if (!entryPrice || !stopLoss) return null;
+                
+                const entry = parseFloat(entryPrice);
+                const sl = parseFloat(stopLoss);
+                const tp = takeProfit ? parseFloat(takeProfit) : null;
+                
+                const riskAmount = (accountBalance * riskPercentage) / 100;
+                const pipDiff = Math.abs(entry - sl) / assets[selectedAsset].pipValue;
+                
+                const lotSize = riskAmount / (pipDiff * assets[selectedAsset].pipValue * assets[selectedAsset].contractSize);
+                
+                let potentialProfit = 0;
+                if (tp) {
+                    const profitPips = Math.abs(tp - entry) / assets[selectedAsset].pipValue;
+                    potentialProfit = profitPips * assets[selectedAsset].pipValue * assets[selectedAsset].contractSize * lotSize;
+                }
+                
+                return {
+                    lotSize: lotSize.toFixed(2),
+                    riskAmount: riskAmount.toFixed(2),
+                    potentialProfit: potentialProfit.toFixed(2),
+                    riskRewardRatio: tp ? (potentialProfit / riskAmount).toFixed(2) : 'N/A',
+                    pipRisk: pipDiff.toFixed(1)
+                };
+            };
+
+            const position = calculatePosition();
+
+            const addTrade = () => {
+                const newTrade = {
+                    id: trades.length + 1,
+                    date: new Date().toISOString().split('T')[0],
+                    asset: '',
+                    type: 'Long',
+                    entry: 0,
+                    exit: 0,
+                    lots: 0,
+                    risk: 0,
+                    profit: 0,
+                    balance: trades.length > 0 ? trades[trades.length - 1].balance : accountBalance
+                };
+                setTrades([...trades, newTrade]);
+            };
+
+            const updateTrade = (id, field, value) => {
+                setTrades(trades.map(trade => {
+                    if (trade.id === id) {
+                        const updated = { ...trade, [field]: value };
+                        
+                        if (field === 'exit' || field === 'entry' || field === 'lots') {
+                            const profitPips = Math.abs(parseFloat(updated.exit || 0) - parseFloat(updated.entry || 0));
+                            updated.profit = parseFloat((profitPips * parseFloat(updated.lots || 0) * 100).toFixed(2));
+                            
+                            const prevTrade = trades.find(t => t.id === id - 1);
+                            const prevBalance = prevTrade ? prevTrade.balance : accountBalance;
+                            updated.balance = parseFloat((prevBalance + updated.profit).toFixed(2));
+                        }
+                        
+                        return updated;
+                    }
+                    return trade;
+                }));
+            };
+
+            const deleteTrade = (id) => {
+                setTrades(trades.filter(trade => trade.id !== id));
+            };
+
+            const performanceMetrics = useMemo(() => {
+                if (trades.length === 0) return null;
+                
+                const totalTrades = trades.filter(t => t.profit !== 0).length;
+                const winningTrades = trades.filter(t => t.profit > 0).length;
+                const losingTrades = trades.filter(t => t.profit < 0).length;
+                const totalProfit = trades.reduce((sum, t) => sum + t.profit, 0);
+                const winRate = totalTrades > 0 ? ((winningTrades / totalTrades) * 100).toFixed(1) : 0;
+                const currentBalance = trades[trades.length - 1].balance || accountBalance;
+                const percentageGrowth = (((currentBalance - accountBalance) / accountBalance) * 100).toFixed(2);
+                
+                const avgProfitPerTrade = totalTrades > 0 ? totalProfit / totalTrades : 0;
+                const projection = [];
+                for (let i = 0; i < 20; i++) {
+                    const futureBalance = currentBalance + (avgProfitPerTrade * i);
+                    projection.push({
+                        trade: totalTrades + i,
+                        projected: parseFloat(futureBalance.toFixed(2))
+                    });
+                }
+                
+                return {
+                    totalTrades,
+                    winningTrades,
+                    losingTrades,
+                    winRate,
+                    totalProfit: totalProfit.toFixed(2),
+                    currentBalance: currentBalance.toFixed(2),
+                    percentageGrowth,
+                    projection
+                };
+            }, [trades, accountBalance]);
+
+            const chartData = trades.map((trade, idx) => ({
+                trade: idx + 1,
+                balance: trade.balance,
+                profit: trade.profit
+            }));
+
+            return (
+                <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white p-6">
+                    <div className="max-w-7xl mx-auto">
+                        <h1 className="text-4xl font-bold mb-2 bg-gradient-to-r from-blue-400 to-purple-500 bg-clip-text text-transparent">
+                            Trading Calculator Pro
+                        </h1>
+                        <p className="text-slate-400 mb-6">5% Risk Management System</p>
+
+                        <div className="bg-slate-800 rounded-lg p-6 mb-6 border border-slate-700">
+                            <h2 className="text-xl font-semibold mb-4">Account Settings</h2>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-sm text-slate-400 mb-2">Account Balance ($)</label>
+                                    <input
+                                        type="number"
+                                        value={accountBalance}
+                                        onChange={(e) => setAccountBalance(parseFloat(e.target.value) || 0)}
+                                        className="w-full bg-slate-700 border border-slate-600 rounded px-4 py-2 text-white"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm text-slate-400 mb-2">Risk Per Trade (%)</label>
+                                    <input
+                                        type="number"
+                                        value={riskPercentage}
+                                        onChange={(e) => setRiskPercentage(parseFloat(e.target.value) || 0)}
+                                        className="w-full bg-slate-700 border border-slate-600 rounded px-4 py-2 text-white"
+                                    />
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="flex space-x-2 mb-6">
+                            <button
+                                onClick={() => setActiveTab('calculator')}
+                                className={`flex items-center space-x-2 px-6 py-3 rounded-lg font-medium transition ${
+                                    activeTab === 'calculator'
+                                        ? 'bg-blue-600 text-white'
+                                        : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
+                                }`}
+                            >
+                                <Calculator />
+                                <span>Risk Calculator</span>
+                            </button>
+                            <button
+                                onClick={() => setActiveTab('log')}
+                                className={`flex items-center space-x-2 px-6 py-3 rounded-lg font-medium transition ${
+                                    activeTab === 'log'
+                                        ? 'bg-blue-600 text-white'
+                                        : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
+                                }`}
+                            >
+                                <TrendingUp />
+                                <span>Trade Log</span>
+                            </button>
+                            <button
+                                onClick={() => setActiveTab('performance')}
+                                className={`flex items-center space-x-2 px-6 py-3 rounded-lg font-medium transition ${
+                                    activeTab === 'performance'
+                                        ? 'bg-blue-600 text-white'
+                                        : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
+                                }`}
+                            >
+                                <BarChart3 />
+                                <span>Performance</span>
+                            </button>
+                        </div>
+
+                        {activeTab === 'calculator' && (
+                            <div className="bg-slate-800 rounded-lg p-6 border border-slate-700">
+                                <h2 className="text-2xl font-semibold mb-6">Position Size Calculator</h2>
+                                
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                                    <div>
+                                        <label className="block text-sm text-slate-400 mb-2">Asset</label>
+                                        <select
+                                            value={selectedAsset}
+                                            onChange={(e) => setSelectedAsset(e.target.value)}
+                                            className="w-full bg-slate-700 border border-slate-600 rounded px-4 py-2 text-white"
+                                        >
+                                            {Object.keys(assets).map(key => (
+                                                <option key={key} value={key}>{assets[key].name}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm text-slate-400 mb-2">Entry Price</label>
+                                        <input
+                                            type="number"
+                                            step="0.00001"
+                                            value={entryPrice}
+                                            onChange={(e) => setEntryPrice(e.target.value)}
+                                            className="w-full bg-slate-700 border border-slate-600 rounded px-4 py-2 text-white"
+                                            placeholder="e.g., 1.0950"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm text-slate-400 mb-2">Stop Loss</label>
+                                        <input
+                                            type="number"
+                                            step="0.00001"
+                                            value={stopLoss}
+                                            onChange={(e) => setStopLoss(e.target.value)}
+                                            className="w-full bg-slate-700 border border-slate-600 rounded px-4 py-2 text-white"
+                                            placeholder="e.g., 1.0900"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm text-slate-400 mb-2">Take Profit (Optional)</label>
+                                        <input
+                                            type="number"
+                                            step="0.00001"
+                                            value={takeProfit}
+                                            onChange={(e) => setTakeProfit(e.target.value)}
+                                            className="w-full bg-slate-700 border border-slate-600 rounded px-4 py-2 text-white"
+                                            placeholder="e.g., 1.1050"
+                                        />
+                                    </div>
+                                </div>
+
+                                {position && (
+                                    <div className="bg-slate-900 rounded-lg p-6 border border-slate-700">
+                                        <h3 className="text-xl font-semibold mb-4 text-blue-400">Calculation Results</h3>
+                                        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                                            <div className="bg-slate-800 p-4 rounded-lg">
+                                                <p className="text-slate-400 text-sm mb-1">Position Size</p>
+                                                <p className="text-2xl font-bold text-green-400">{position.lotSize} lots</p>
+                                            </div>
+                                            <div className="bg-slate-800 p-4 rounded-lg">
+                                                <p className="text-slate-400 text-sm mb-1">Risk Amount</p>
+                                                <p className="text-2xl font-bold text-red-400">${position.riskAmount}</p>
+                                            </div>
+                                            <div className="bg-slate-800 p-4 rounded-lg">
+                                                <p className="text-slate-400 text-sm mb-1">Potential Profit</p>
+                                                <p className="text-2xl font-bold text-green-400">${position.potentialProfit}</p>
+                                            </div>
+                                            <div className="bg-slate-800 p-4 rounded-lg">
+                                                <p className="text-slate-400 text-sm mb-1">Risk/Reward</p>
+                                                <p className="text-2xl font-bold text-blue-400">{position.riskRewardRatio}:1</p>
+                                            </div>
+                                            <div className="bg-slate-800 p-4 rounded-lg">
+                                                <p className="text-slate-400 text-sm mb-1">Pip Risk</p>
+                                                <p className="text-2xl font-bold text-yellow-400">{position.pipRisk} pips</p>
+                                            </div>
+                                            <div className="bg-slate-800 p-4 rounded-lg">
+                                                <p className="text-slate-400 text-sm mb-1">Risk %</p>
+                                                <p className="text-2xl font-bold text-purple-400">{riskPercentage}%</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
+                        {activeTab === 'log' && (
+                            <div className="bg-slate-800 rounded-lg p-6 border border-slate-700">
+                                <div className="flex justify-between items-center mb-6">
+                                    <h2 className="text-2xl font-semibold">Trade Journal</h2>
+                                    <button
+                                        onClick={addTrade}
+                                        className="flex items-center space-x-2 bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-lg transition"
+                                    >
+                                        <Plus />
+                                        <span>Add Trade</span>
+                                    </button>
+                                </div>
+
+                                <div className="overflow-x-auto">
+                                    <table className="w-full">
+                                        <thead>
+                                            <tr className="border-b border-slate-700">
+                                                <th className="text-left p-3 text-slate-400">Date</th>
+                                                <th className="text-left p-3 text-slate-400">Asset</th>
+                                                <th className="text-left p-3 text-slate-400">Type</th>
+                                                <th className="text-left p-3 text-slate-400">Entry</th>
+                                                <th className="text-left p-3 text-slate-400">Exit</th>
+                                                <th className="text-left p-3 text-slate-400">Lots</th>
+                                                <th className="text-left p-3 text-slate-400">Risk ($)</th>
+                                                <th className="text-left p-3 text-slate-400">P/L ($)</th>
+                                                <th className="text-left p-3 text-slate-400">Balance</th>
+                                                <th className="text-left p-3 text-slate-400"></th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {trades.map((trade) => (
+                                                <tr key={trade.id} className="border-b border-slate-700">
+                                                    <td className="p-3">
+                                                        <input
+                                                            type="date"
+                                                            value={trade.date}
+                                                            onChange={(e) => updateTrade(trade.id, 'date', e.target.value)}
+                                                            className="bg-slate-700 border border-slate-600 rounded px-2 py-1 text-sm"
+                                                        />
+                                                    </td>
+                                                    <td className="p-3">
+                                                        <input
+                                                            type="text"
+                                                            value={trade.asset}
+                                                            onChange={(e) => updateTrade(trade.id, 'asset', e.target.value)}
+                                                            className="bg-slate-700 border border-slate-600 rounded px-2 py-1 text-sm w-24"
+                                                            placeholder="EURUSD"
+                                                        />
+                                                    </td>
+                                                    <td className="p-3">
+                                                        <select
+                                                            value={trade.type}
+                                                            onChange={(e) => updateTrade(trade.id, 'type', e.target.value)}
+                                                            className="bg-slate-700 border border-slate-600 rounded px-2 py-1 text-sm"
+                                                        >
+                                                            <option>Long</option>
+                                                            <option>Short</option>
+                                                        </select>
+                                                    </td>
+                                                    <td className="p-3">
+                                                        <input
+                                                            type="number"
+                                                            step="0.00001"
+                                                            value={trade.entry}
+                                                            onChange={(e) => updateTrade(trade.id, 'entry', parseFloat(e.target.value) || 0)}
+                                                            className="bg-slate-700 border border-slate-600 rounded px-2 py-1 text-sm w-24"
+                                                        />
+                                                    </td>
+                                                    <td className="p-3">
+                                                        <input
+                                                            type="number"
+                                                            step="0.00001"
+                                                            value={trade.exit}
+                                                            onChange={(e) => updateTrade(trade.id, 'exit', parseFloat(e.target.value) || 0)}
+                                                            className="bg-slate-700 border border-slate-600 rounded px-2 py-1 text-sm w-24"
+                                                        />
+                                                    </td>
+                                                    <td className="p-3">
+                                                        <input
+                                                            type="number"
+                                                            step="0.01"
+                                                            value={trade.lots}
+                                                            onChange={(e) => updateTrade(trade.id, 'lots', parseFloat(e.target.value) || 0)}
+                                                            className="bg-slate-700 border border-slate-600 rounded px-2 py-1 text-sm w-20"
+                                                        />
+                                                    </td>
+                                                    <td className="p-3">
+                                                        <input
+                                                            type="number"
+                                                            step="0.01"
+                                                            value={trade.risk}
+                                                            onChange={(e) => updateTrade(trade.id, 'risk', parseFloat(e.target.value) || 0)}
+                                                            className="bg-slate-700 border border-slate-600 rounded px-2 py-1 text-sm w-20"
+                                                        />
+                                                    </td>
+                                                    <td className={`p-3 font-semibold ${trade.profit >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                                                        ${trade.profit.toFixed(2)}
+                                                    </td>
+                                                    <td className="p-3 font-semibold text-blue-400">
+                                                        ${trade.balance.toFixed(2)}
+                                                    </td>
+                                                    <td className="p-3">
+                                                        <button
+                                                            onClick={() => deleteTrade(trade.id)}
+                                                            className="text-red-400 hover:text-red-300"
+                                                        >
+                                                            <Trash2 />
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        )}
+
+                        {activeTab === 'performance' && performanceMetrics && (
+                            <div className="space-y-6">
+                                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                    <div className="bg-slate-800 rounded-lg p-6 border border-slate-700">
+                                        <p className="text-slate-400 text-sm mb-1">Total Trades</p>
+                                        <p className="text-3xl font-bold text-blue-400">{performanceMetrics.totalTrades}</p>
+                                    </div>
+                                    <div className="bg-slate-800 rounded-lg p-6 border border-slate-700">
+                                        <p className="text-slate-400 text-sm mb-1">Win Rate</p>
+                                        <p className="text-3xl font-bold text-green-400">{performanceMetrics.winRate}%</p>
+                                    </div>
+                                    <div className="bg-slate-800 rounded-lg p-6 border border-slate-700">
+                                        <p className="text-slate-400 text-sm mb-1">Total Profit</p>
+                                        <p className={`text-3xl font-bold ${parseFloat(performanceMetrics.totalProfit) >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                                            ${performanceMetrics.totalProfit}
+                                        </p>
+                                    </div>
+                                    <div className="bg-slate-800 rounded-lg p-6 border border-slate-700">
+                                        <p className="text-slate-400 text-sm mb-1">Account Growth</p>
+                                        <p className={`text-3xl font-bold ${parseFloat(performanceMetrics.percentageGrowth) >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                                            {performanceMetrics.percentageGrowth}%
+                                        </p>
+                                    </div>
+                                </div>
+
+                                <div className="bg-slate-800 rounded-lg p-6 border border-slate-700">
+                                    <h3 className="text-xl font-semibold mb-4">Account Balance Over Time</h3>
+                                    <ResponsiveContainer width="100%" height={300}>
+                                        <LineChart data={chartData}>
+                                            <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+                                            <XAxis dataKey="trade" stroke="#9ca3af" />
+                                            <YAxis stroke="#9ca3af" />
+                                            <Tooltip 
+                                                contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #475569' }}
+                                                labelStyle={{ color: '#e2e8f0' }}
+                                            />
+                                            <Legend />
+                                            <Line type="monotone" dataKey="balance" stroke="#3b82f6" strokeWidth={2} name="Balance ($)" />
+                                        </LineChart>
+                                    </ResponsiveContainer>
+                                </div>
+
+                                <div className="bg-slate-800 rounded-lg p-6 border border-slate-700">
+                                    <h3 className="text-xl font-semibold mb-4">Account Projection (Next 20 Trades)</h3>
+                                    <p className="text-slate-400 text-sm mb-4">Based on average profit per trade</p>
+                                    <ResponsiveContainer width="100%" height={300}>
+                                        <LineChart data={performanceMetrics.projection}>
+                                            <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+                                            <XAxis dataKey="trade" stroke="#9ca3af" />
+                                            <YAxis stroke="#9ca3af" />
+                                            <Tooltip 
+                                                contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #475569' }}
+                                                labelStyle={{ color: '#e2e8f0' }}
+                                            />
+                                            <Legend />
+                                            <Line type="monotone" dataKey="projected" stroke="#8b5cf6" strokeWidth={2} strokeDasharray="5 5" name="Projected Balance ($)" />
+                                        </LineChart>
+                                    </ResponsiveContainer>
+                                </div>
+
+                                <div className="bg-slate-800 rounded-lg p-6 border border-slate-700">
+                                    <h3 className="text-xl font-semibold mb-4">Win/Loss Breakdown</h3>
+                                    <div className="grid grid-cols-3 gap-4">
+                                        <div className="text-center">
+                                            <p className="text-slate-400 mb-2">Winning Trades</p>
+                                            <p className="text-4xl font-bold text-green-400">{performanceMetrics.winningTrades}</p>
+                                        </div>
+                                        <div className="text-center">
+                                            <p className="text-slate-400 mb-2">Losing Trades</p>
+                                            <p className="text-4xl font-bold text-red-400">{performanceMetrics.losingTrades}</p>
+                                        </div>
+                                        <div className="text-center">
+                                            <p className="text-slate-400 mb-2">Current Balance</p>
+                                            <p className="text-4xl font-bold text-blue-400">${performanceMetrics.currentBalance}</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            );
+        };
+
+        ReactDOM.render(<TradeCalculator />, document.getElementById('root'));
+    </script>
+</body>
+</html>
